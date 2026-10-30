@@ -216,6 +216,50 @@ an override rather than hardcoded.
 This assumption went unchecked through a requirement, a guard, a README section and a lab scenario
 before being caught by running it.
 
+### F14 — Env CAN be injected into another app, but not through the public API ✅ *(live-verified)*
+
+`pm2.restart(name, { env: {...} })` does **not** inject variables. PM2 reads `env` as an
+environment *name* (`--env production`) and rejects the call:
+
+```
+Using --env [env] without passing the ecosystem.config.js does not work
+```
+
+The daemon RPC does accept an env object. `God.restartProcessId`, `God.reloadProcessId` and
+`God.softReloadProcessId` all run `Utility.extend(proc.pm2_env.env, opts.env)` before acting, so:
+
+```js
+pm2.Client.executeRemote('restartProcessId', { id, env: { SECRET: 'v' } }, cb)
+```
+
+injects the variable and restarts the instance with it. Verified end to end: the app printed the
+injected value and `pm2_env.env` carried it.
+
+**Consequences:** `pm2-secrets` is feasible. Cluster apps can take new values **zero-downtime**
+via `reloadProcessId`; fork apps need `restartProcessId`. But `executeRemote` is an internal
+surface, not a documented API — it is a dependency to pin PM2 versions against and to re-verify
+on upgrade.
+
+### F15 — Injected env is NOT private, and `pm2 save` writes it to a world-readable file ⚠️ ✅ *(live-verified)*
+
+Anything placed in `pm2_env.env` is visible to anyone who can talk to the daemon:
+
+| Surface | Exposure |
+| --- | --- |
+| `pm2 env <id>` | prints the value in plaintext |
+| `pm2 jlist` | contains the value |
+| `pm2 save` → `$PM2_HOME/dump.pm2` | **plaintext on disk, mode 0664 (world-readable)** |
+
+**Consequence for `pm2-secrets`:** "removes plaintext `.env` files from servers" is only half
+true. Direct env injection moves the secret out of git and into a vault with central rotation and
+audit — real benefits — but locally it is *less* private than a `.env` file at 0600, because the
+dump is world-readable.
+
+The requirement that secrets be "masked in `pm2 env` and `pm2 show` output" is therefore **not
+achievable**: PM2 owns that output and we are injecting into the structure it prints. A module can
+only mask its *own* logs, warn about the exposure, and offer a mode that avoids `pm2_env`
+altogether by writing a 0600 file and injecting only its path.
+
 ### F12 — In cluster mode the WORKER owns the log file descriptors ⚠️ ✅ *(live-verified)*
 
 `ProcessContainer.js` replaces `process.stdout.write` / `process.stderr.write` in each cluster
