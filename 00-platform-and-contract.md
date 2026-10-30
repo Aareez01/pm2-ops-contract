@@ -216,6 +216,36 @@ an override rather than hardcoded.
 This assumption went unchecked through a requirement, a guard, a README section and a lab scenario
 before being caught by running it.
 
+### F12 — In cluster mode the WORKER owns the log file descriptors ⚠️
+
+`ProcessContainer.js` replaces `process.stdout.write` / `process.stderr.write` in each cluster
+worker. The replacement writes to the log file **from the worker process** and forwards a copy to
+the daemon over IPC (`process.send({ type: 'log:out', ... })`), which is what produces the
+`log:out` / `log:err` bus events. `StdioLogger.js` states in its own header that what reaches the
+daemon's pipe is only what *bypassed* those hooks — direct fd writes (pino, sonic-boom), children
+spawned with `stdio: 'inherit'`, native addons.
+
+**Consequence:** renaming a log file does not redirect PM2's writes. Every worker keeps its open
+descriptor and keeps appending to the renamed or deleted inode — the file disappears from `ls`
+while the disk keeps filling. Any log rotator that treats rotation as a rename is broken in cluster
+mode by construction.
+
+### F13 — Reopening log files is an explicit, per-worker, refusable protocol
+
+`God.reloadLogs` (`lib/God/ActionMethods.js`) recreates the daemon-side streams first, then sends
+`{ type: 'log:reload' }` to each cluster worker; the worker closes its streams and calls
+`Utility.startLogging` again. It **deliberately skips workers whose IPC channel is closed**, with
+the comment that `send()` on a dead channel raises an async `ERR_IPC_CHANNEL_CLOSED` that kills the
+daemon.
+
+Log paths also carry a `-<pm_id>` suffix per instance unless `merge_logs` is set, in which case
+every instance appends to one shared file.
+
+**Consequences:** rotation is rename → `reloadLogs` → compress, in that order; a worker restarting
+during rotation is silently not notified and must be reconciled afterwards; and a shipper must
+handle both the per-instance and merged layouts, attributing merged lines to an app rather than an
+instance.
+
 ### F9 — A long `PM2_HOME` silently wedges PM2 entirely ⚠️ *(found the hard way)*
 
 PM2 binds `$PM2_HOME/rpc.sock` and `$PM2_HOME/pub.sock`. Linux caps unix socket paths (`sun_path`) at

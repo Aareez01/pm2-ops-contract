@@ -11,7 +11,8 @@ them. Those live here rather than being duplicated into each repo and left to dr
 
 | File | What it is |
 | --- | --- |
-| [`00-platform-and-contract.md`](./00-platform-and-contract.md) | Verified PM2 platform findings (F1–F10) and the `pm2-probe:status` wire contract |
+| [`00-platform-and-contract.md`](./00-platform-and-contract.md) | Verified PM2 platform findings (F1–F13) and the `pm2-probe:status` wire contract |
+| [`03-pm2-shipper.md`](./03-pm2-shipper.md) | Requirements for `pm2-shipper`, parked here until that repo exists |
 
 Each module's own requirements live with its code:
 
