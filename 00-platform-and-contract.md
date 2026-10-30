@@ -2,7 +2,7 @@
 
 **Status:** Draft · **Date:** 2026-10-30 · **Verified against:** PM2 7.1.1 (source inspection + executed tests)
 
-Scope decision: Phase 1 is `pm2-probe` and `pm2-alertmanager` only. Open-source, published to npm,
+Scope decision: Phase 1 is `pm2-liveness` and `pm2-alertmanager` only. Open-source, published to npm,
 installed via `pm2 install`. TypeScript, **independent repositories**.
 
 Because the repos are independent, the link between them must be a **versioned wire contract**, not a
@@ -44,7 +44,7 @@ containing both `probe` and `pm2_ops` keys; `pm2 jlist` reported `probe: false`,
 |---|---|---|---|
 | **Module config** | `pm2 set <module>:<key> <value>` → `~/.pm2/module_conf.json` | Yes | module's own env at boot |
 | **App env vars** | `env: { PM2_PROBE_HTTP: '...' }` | Yes | `pm2.list()` → `pm2_env` |
-| **Sidecar file** | module reads its own file (e.g. `pm2-probe.config.js`) | Yes | direct file read |
+| **Sidecar file** | module reads its own file (e.g. `pm2-liveness.config.js`) | Yes | direct file read |
 
 `env_*` is technically available but is PM2's deploy-environment mechanism (`--env <name>`);
 hijacking it would collide with legitimate use. **Do not use it.**
@@ -53,7 +53,7 @@ hijacking it would collide with legitimate use. **Do not use it.**
 `pm2_env.env.PORT`. Consumers should check both, since which one is populated depends on how the app
 was started. `increment_var: 'PORT'` correctly yielded distinct ports per instance
 (`pm_id0=:3100, pm_id1=:3101`), which is what makes per-instance HTTP probing possible at all — see
-REQ-PR-11 and the cluster-mode caveat in `pm2-probe/docs/requirements.md`.
+REQ-PR-11 and the cluster-mode caveat in `pm2-liveness/docs/requirements.md`.
 
 ### F3 — `pm2 set` *does* restart the target module
 
@@ -106,7 +106,7 @@ The skeleton's probe module restarted an instance **programmatically** via `pm2.
 the resulting event carried `manually=true`.
 
 **Consequence — and a second correction.** `manually` cannot be read as "a human did it": a
-`pm2.restart()` from `pm2-probe` sets it. But the more important fact is that **it is always `false`
+`pm2.restart()` from `pm2-liveness` sets it. But the more important fact is that **it is always `false`
 on an `exit` event**, so it cannot classify an exit at all:
 
 ```js
@@ -174,7 +174,7 @@ global bus under `type` as the event name, and forwarded to **every** external `
    must be inside `data`.
 
 **Live-verified — this is the single most important confirmation in this document.** The skeleton's
-probe process emitted `pm2-probe:status`; a separate listener process received it via `launchBus`
+probe process emitted `pm2-liveness:status`; a separate listener process received it via `launchBus`
 with the payload fully intact:
 
 ```json
@@ -208,7 +208,7 @@ event-loop figures require an app instrumented with `@pm2/io`. **That is false o
 "Heap Usage": {...}, "Active handles": {...}
 ```
 
-**Consequences:** `pm2-probe`'s `loopLag` works out of the box; values arrive as **strings**, so they
+**Consequences:** `pm2-liveness`'s `loopLag` works out of the box; values arrive as **strings**, so they
 must be parsed; the default metric is a **p50**, with p95 available by name. The metric *names* still
 come from the instrumentation layer rather than PM2's API, so they should be matched by pattern with
 an override rather than hardcoded.
@@ -329,12 +329,12 @@ diagnostic whatsoever, and `pm2 kill` cannot clear it — orphans must be killed
 (`lib/API/Modules/NPM.js`, `getNPMCommandLine`), preferring `bun install --cwd` when bun is present.
 
 Because npm 7+ installs peer dependencies automatically, declaring `pm2` as a **peerDependency**
-rather than a dependency works: verified by packing `pm2-probe` and installing the tarball with
+rather than a dependency works: verified by packing `pm2-liveness` and installing the tarball with
 `--prefix`, after which `require.resolve('pm2')` from the installed module resolved correctly.
 
 Two consequences worth knowing:
 
-- **A second copy of PM2 is installed** inside the module directory (47 packages for `pm2-probe`).
+- **A second copy of PM2 is installed** inside the module directory (47 packages for `pm2-liveness`).
   The declared production tree stays at 3 packages, but install footprint is not actually reduced —
   the real benefit of the peer declaration is avoiding a *version* lock, not avoiding the download.
 - **Version skew is possible.** A peer range of `>=5` lets npm install a PM2 newer than the host
@@ -345,10 +345,10 @@ Two consequences worth knowing:
 
 ## 2. The wire contract
 
-Event name: **`pm2-probe:status`** — a single event type carrying a state transition. One event type
+Event name: **`pm2-liveness:status`** — a single event type carrying a state transition. One event type
 rather than several keeps the contract small and lets consumers filter on `data.state`.
 
-Emitted by `pm2-probe` via `process.send({ type: 'pm2-probe:status', data: <payload> })`.
+Emitted by `pm2-liveness` via `process.send({ type: 'pm2-liveness:status', data: <payload> })`.
 
 ### Payload v1
 
@@ -380,7 +380,7 @@ Emitted by `pm2-probe` via `process.send({ type: 'pm2-probe:status', data: <payl
 - **C3** — Consumers MUST tolerate unknown extra fields.
 - **C4** — The required fields are `v`, `state`, `app`, `pm_id`, `probe`, `probe_kind`, `at`. All
   others are optional and consumers must handle their absence.
-- **C5** — `pm2-probe` MUST function fully with no consumer present. `pm2-alertmanager` MUST function
+- **C5** — `pm2-liveness` MUST function fully with no consumer present. `pm2-alertmanager` MUST function
   (on native events alone) with no probe installed. Neither may hard-depend on the other.
 - **C6** — The contract is published as a standalone zero-dependency package,
   **`@pm2-ops/probe-contract`**, containing the TypeScript types and a runtime validator. Both repos
@@ -415,7 +415,7 @@ Applies to both modules.
 
 | # | Question | Blocks | Proposed default |
 |---|---|---|---|
-| ~~Q1~~ | ~~Does `pm2 install <pkg>` work cleanly?~~ | — | **Resolved — see F10.** Unscoped `pm2-probe` chosen; peer deps resolve correctly |
+| ~~Q1~~ | ~~Does `pm2 install <pkg>` work cleanly?~~ | — | **Resolved — see F10.** Unscoped `pm2-liveness` chosen; peer deps resolve correctly |
 | ~~Q2~~ | ~~Tail the daemon log to detect memory restarts?~~ | — | **Resolved — implemented and lab-verified.** See F6 |
 | Q3 | Should the probe's HTTP endpoint (REQ-PR-20) bind by default? | Security | **No** — opt-in, loopback-only default |
 | ~~Q4~~ | ~~Minimum viable alert channels for v1?~~ | — | **Superseded.** Originally decided as Slack + generic webhook only. Scope was widened on request to add Teams, Telegram, PagerDuty, Opsgenie and SMTP. PagerDuty and Opsgenie earn their place by closing the same incident on resolution rather than opening a new one; SMTP keeps nodemailer as an optional dependency |

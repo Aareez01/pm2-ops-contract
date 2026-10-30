@@ -1,5 +1,5 @@
 // Publishes an axm:monitor metric exactly as an instrumented app does. PM2's daemon
-// merges msg.data into pm2_env.axm_monitor, which is where pm2-probe reads loopLag from.
+// merges msg.data into pm2_env.axm_monitor, which is where pm2-liveness reads loopLag from.
 // LAG_MS controls the reported figure; INSTRUMENTED=false publishes nothing at all,
 // so the "uninstrumented app is refused, not silently passed" case can be exercised.
 const http = require('http');

@@ -1,4 +1,4 @@
-DESC="pm2-probe restarts only the hung instance, leaving its sibling alone"
+DESC="pm2-liveness restarts only the hung instance, leaving its sibling alone"
 run() {
   pm2x start "$FIXTURES/eco-healthy.config.js" >/dev/null 2>&1
   wait_for 15 "both instances serving" 'curl -sf -m2 http://127.0.0.1:3200/health && curl -sf -m2 http://127.0.0.1:3201/health'

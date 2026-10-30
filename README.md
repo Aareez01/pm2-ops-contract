@@ -11,24 +11,24 @@ them. Those live here rather than being duplicated into each repo and left to dr
 
 | File | What it is |
 | --- | --- |
-| [`00-platform-and-contract.md`](./00-platform-and-contract.md) | Verified PM2 platform findings (F1–F13) and the `pm2-probe:status` wire contract |
+| [`00-platform-and-contract.md`](./00-platform-and-contract.md) | Verified PM2 platform findings (F1–F13) and the `pm2-liveness:status` wire contract |
 
 
 Each module's own requirements live with its code:
 
-- [`pm2-probe/docs/requirements.md`](../pm2-probe/docs/requirements.md) — the producer
+- [`pm2-liveness/docs/requirements.md`](../pm2-liveness/docs/requirements.md) — the producer
 - [`pm2-alertmanager/docs/requirements.md`](../pm2-alertmanager/docs/requirements.md) — the consumer
 - [`pm2-shipper/docs/requirements.md`](../pm2-shipper/docs/requirements.md) — rotation and shipping
 
 ## Why a contract document rather than a shared package
 
-`pm2-probe:status` is a **wire** contract, like a webhook payload — not a shared library type.
+`pm2-liveness:status` is a **wire** contract, like a webhook payload — not a shared library type.
 Consumers carry their own copy of the type and a small validator, exactly as they would for any
 JSON they receive over a bus. A published `@pm2-ops/probe-contract` package was considered and
 rejected for v1: three npm packages before either module has a user is premature, and a version
 field in the payload already does the job a shared package would.
 
-This document is the normative definition. The copy in `pm2-probe/src/events/contract.ts` and the
+This document is the normative definition. The copy in `pm2-liveness/src/events/contract.ts` and the
 one in the eventual `pm2-alertmanager` are implementations of it.
 
 ## Status of the findings
@@ -52,11 +52,11 @@ paths that neither module's own tests can reach:
 
 - the real `pm2 install` path — tarball install, `pmx_module`, `module_conf.json`, and the
   restart that `pm2 set` triggers;
-- the wire contract **across process boundaries** — `pm2-probe` emits, `pm2-alertmanager`
+- the wire contract **across process boundaries** — `pm2-liveness` emits, `pm2-alertmanager`
   consumes, and a local webhook collector records what a human would have been sent.
 
 ```bash
-(cd ../pm2-probe && npm run build) && (cd ../pm2-alertmanager && npm run build)
+(cd ../pm2-liveness && npm run build) && (cd ../pm2-alertmanager && npm run build)
 ./conformance/run.sh
 ```
 

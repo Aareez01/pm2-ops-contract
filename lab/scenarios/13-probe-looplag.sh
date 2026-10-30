@@ -7,8 +7,8 @@ run() {
   pm2x start "$FIXTURES/eco-laggy.config.js" >/dev/null 2>&1
   sleep 3
   set_probe_apps '{"laggy-app":{"action":"none","liveness":{"loopLag":{"maxLagMs":100,"metricName":"No Such Metric"},"periodSeconds":2,"failureThreshold":2}}}'
-  wait_for 25 "the guard to refuse the app" 'pm2x logs pm2-probe --nostream --lines 60 2>/dev/null | grep -q "refusing to probe app"'
-  local logs; logs=$(pm2x logs pm2-probe --nostream --lines 60 2>/dev/null)
+  wait_for 25 "the guard to refuse the app" 'pm2x logs pm2-liveness --nostream --lines 60 2>/dev/null | grep -q "refusing to probe app"'
+  local logs; logs=$(pm2x logs pm2-liveness --nostream --lines 60 2>/dev/null)
   assert_grep "refusing to probe app" "$logs" "app with no usable metric was refused"
   assert_grep "No Such Metric" "$logs" "the reason names the metric that is missing"
   assert_eq "$(alerts_count laggy-app)" "0" "a refused app produces no false health signal"

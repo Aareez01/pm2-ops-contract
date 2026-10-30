@@ -115,4 +115,4 @@ reset_apps() { # remove every non-module app so scenarios cannot contaminate eac
   clear_alerts
 }
 
-set_probe_apps() { pm2x set pm2-probe:apps "$1" >/dev/null 2>&1; sleep 2; }
+set_probe_apps() { pm2x set pm2-liveness:apps "$1" >/dev/null 2>&1; sleep 2; }

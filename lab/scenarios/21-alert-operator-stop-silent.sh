@@ -10,7 +10,7 @@ run() {
   local n; n=$(alerts_count healthy-app)
   assert_eq "$n" "0" "a deliberate pm2 stop produced no alert"
 
-  # The same events carry manually=true when pm2-probe restarts something, which is why
+  # The same events carry manually=true when pm2-liveness restarts something, which is why
   # that flag must never be used to decide what is operator action.
   pm2x delete healthy-app >/dev/null 2>&1
   clear_alerts

@@ -7,7 +7,7 @@ run() {
   set_probe_apps '{"healthy-app":{"action":"restart","liveness":{"http":{"path":"/health","port":3200},"periodSeconds":2,"failureThreshold":2}}}'
   sleep 10
 
-  local logs; logs=$(pm2x logs pm2-probe --nostream --lines 60 2>/dev/null)
+  local logs; logs=$(pm2x logs pm2-liveness --nostream --lines 60 2>/dev/null)
   assert_grep "refusing to probe app" "$logs" "the app was refused rather than probed"
   assert_grep "fixed port|share|no resolvable PORT" "$logs" "the reason explains why"
   assert_grep "increment_var" "$logs" "the log names a concrete remedy"
