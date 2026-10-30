@@ -32,6 +32,15 @@ wait_for() { # wait_for <seconds> <description> <shell expression>
 
 jlist_num() { local v; v=$(jlist_field "$@"); echo "${v:-0}"; }
 
+# pm_ids are assigned across ALL processes, so an app's instances are rarely 0 and 1.
+# Hardcoding them is a mistake this lab has now made twice.
+instance_ids() {
+  pm2x jlist 2>/dev/null | node -e '
+    let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{
+      console.log(JSON.parse(s).filter(x=>x.name===process.argv[1])
+        .map(x=>x.pm_id).sort((a,b)=>a-b).join(" "));});' "$1"
+}
+
 jlist_field() { # jlist_field <app> <pm_id|-> <jsonpath-ish field>
   pm2x jlist 2>/dev/null | node -e '
     let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{

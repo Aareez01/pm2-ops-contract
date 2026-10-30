@@ -216,7 +216,7 @@ an override rather than hardcoded.
 This assumption went unchecked through a requirement, a guard, a README section and a lab scenario
 before being caught by running it.
 
-### F12 — In cluster mode the WORKER owns the log file descriptors ⚠️
+### F12 — In cluster mode the WORKER owns the log file descriptors ⚠️ ✅ *(live-verified)*
 
 `ProcessContainer.js` replaces `process.stdout.write` / `process.stderr.write` in each cluster
 worker. The replacement writes to the log file **from the worker process** and forwards a copy to
@@ -230,7 +230,12 @@ descriptor and keeps appending to the renamed or deleted inode — the file disa
 while the disk keeps filling. Any log rotator that treats rotation as a rename is broken in cluster
 mode by construction.
 
-### F13 — Reopening log files is an explicit, per-worker, refusable protocol
+**Verified by experiment** (lab scenario 40), against a 2-instance cluster app under continuous
+write. After renaming the log file: the renamed inode kept growing, nothing recreated or wrote to
+the original path, and `/proc/<worker-pid>/fd` showed the **worker process** — not the daemon —
+holding the renamed file open.
+
+### F13 — Reopening log files is an explicit, per-worker, refusable protocol ✅ *(live-verified)*
 
 `God.reloadLogs` (`lib/God/ActionMethods.js`) recreates the daemon-side streams first, then sends
 `{ type: 'log:reload' }` to each cluster worker; the worker closes its streams and calls
@@ -245,6 +250,11 @@ every instance appends to one shared file.
 during rotation is silently not notified and must be reconciled afterwards; and a shipper must
 handle both the per-instance and merged layouts, attributing merged lines to an app rather than an
 instance.
+
+**Verified by experiment** (lab scenario 40): after `pm2 reloadLogs`, the workers wrote to the newly
+created file and the renamed one stopped growing — so compression is safe only *after* the reopen,
+never before. Per-instance paths (`chatty-app-out-3.log`, `-4.log`) were confirmed with `merge_logs`
+unset.
 
 ### F9 — A long `PM2_HOME` silently wedges PM2 entirely ⚠️ *(found the hard way)*
 

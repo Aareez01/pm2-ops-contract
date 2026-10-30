@@ -72,7 +72,9 @@ means **no file exists**. PM2 still emits on the bus in that case, but there is 
 
 ## 4. Platform facts that constrain the design
 
-Established by reading PM2 7.1.1; recorded in the platform document as F12–F13.
+Established by reading PM2 7.1.1 **and verified by experiment** before any code was written — lab
+scenario 40, six assertions, against a 2-instance cluster app under continuous write. Recorded in
+the platform document as F12–F13.
 
 ### In cluster mode the WORKER owns the log file descriptors
 
