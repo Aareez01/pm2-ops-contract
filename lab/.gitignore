@@ -1,3 +1,6 @@
 alerts.jsonl
 shipped.log
+secrets.json
+secrets-config.yaml
+secret-store/
 *.tgz

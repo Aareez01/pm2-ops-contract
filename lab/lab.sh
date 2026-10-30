@@ -35,7 +35,7 @@ if [ ${#SOCK} -ge 107 ]; then
   echo "FATAL: PM2_HOME too long (${#SOCK} >= 107) - pm2 would hang. Set PM2_HOME_OVERRIDE."
   exit 1
 fi
-for r in pm2-probe pm2-alertmanager pm2-shipper; do
+for r in pm2-probe pm2-alertmanager pm2-shipper pm2-secrets; do
   [ -f "$BASE/$r/dist/index.js" ] || { echo "FATAL: $r is not built (npm run build)"; exit 1; }
 done
 
@@ -53,6 +53,7 @@ rm -f "$LAB"/*.tgz
 ( cd "$BASE/pm2-probe"        && npm pack --pack-destination "$LAB" >/dev/null 2>&1 )
 ( cd "$BASE/pm2-alertmanager" && npm pack --pack-destination "$LAB" >/dev/null 2>&1 )
 ( cd "$BASE/pm2-shipper"       && npm pack --pack-destination "$LAB" >/dev/null 2>&1 )
+( cd "$BASE/pm2-secrets"       && npm pack --pack-destination "$LAB" >/dev/null 2>&1 )
 pm2x kill >/dev/null 2>&1; rm -rf "$PM2_HOME"; mkdir -p "$PM2_HOME"; clear_alerts
 pm2x ping >/dev/null 2>&1 || { echo "FATAL: daemon did not start"; exit 1; }
 
@@ -62,10 +63,11 @@ pm2x install "$LAB"/pm2-alertmanager-*.tgz >/dev/null 2>&1
 pm2x install "$LAB"/pm2-shipper-*.tgz >/dev/null 2>&1
 # Idle by default: a rotator quietly rotating other scenarios' logs would corrupt them.
 pm2x set pm2-shipper:only __none__ >/dev/null 2>&1
+pm2x install "$LAB"/pm2-secrets-*.tgz >/dev/null 2>&1
 pm2x set pm2-alertmanager:configFile "$FIXTURES/alertmanager.yaml" >/dev/null 2>&1
 pm2x set pm2-probe:reconcileSeconds 5 >/dev/null 2>&1
 sleep 5
-for m in pm2-probe pm2-alertmanager pm2-shipper; do
+for m in pm2-probe pm2-alertmanager pm2-shipper pm2-secrets; do
   st=$(jlist_field "$m" - pm2_env.status)
   [ "$st" = "online" ] || { echo "FATAL: $m is '$st', not online"; pm2x logs "$m" --nostream --lines 20; exit 1; }
 done
