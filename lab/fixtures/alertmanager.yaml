@@ -1,5 +1,5 @@
-# Timings compressed so the suite runs in under two minutes. Production defaults are
-# much longer (60s startup grace, 30s grouping, 5m dedup).
+# Timings compressed so the lab runs quickly. Production defaults are far longer
+# (60s startup grace, 30s grouping, 5m dedup).
 logLevel: debug
 startupGraceSeconds: 5
 resolveAfterSeconds: 10
@@ -11,8 +11,12 @@ suppression:
   crashLoopRenotifySeconds: 3600
   minSeverity: warning
 
+memoryRestarts:
+  enabled: true
+  pollSeconds: 3
+
 content:
-  logLines: 5
+  logLines: 10
 
 channels:
   collector:

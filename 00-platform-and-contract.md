@@ -105,9 +105,21 @@ Note also that `status` is the status **at emit time**, so the `online` event ca
 The skeleton's probe module restarted an instance **programmatically** via `pm2.restart(pm_id)`, and
 the resulting event carried `manually=true`.
 
-**Consequence:** `manually` cannot be used to distinguish operator action from automated action. Any
-requirement that suppresses alerts on `manually === true` would silently swallow every
-probe-initiated restart — exactly the events that matter most. See REQ-AM-03a.
+**Consequence — and a second correction.** `manually` cannot be read as "a human did it": a
+`pm2.restart()` from `pm2-probe` sets it. But the more important fact is that **it is always `false`
+on an `exit` event**, so it cannot classify an exit at all:
+
+```js
+God.notify('exit', proc);          // God.js:505, ActionMethods.js:316 - two args
+God.notify('start', clu, true);    // God.js:128 - three
+// Event.js: manually : typeof(manually) == 'undefined' ? false : true
+```
+
+It is only ever true on `start` and on the `restart` event raised through `notifyByProcessId`.
+
+An earlier revision of REQ-AM-03a proposed using the flag to tell a deliberate stop from a crash.
+That could never have worked, and the lab proved it: the scenario did not change. The real
+discriminator is **what follows the exit**, not the exit itself. See REQ-AM-03a.
 
 ### F5 — `process:event` payload shape
 
@@ -126,7 +138,12 @@ needing it must call `pm2.list()` separately.
 `lib/Worker.js` calls `God.reloadProcessId()` directly and logs to the daemon's own stdout. The
 resulting bus traffic is indistinguishable from any other reload. The gap-analysis document lists
 "memory restart" as an alert event; delivering it requires either sampling `monit.memory` before the
-restart and inferring, or tailing PM2's daemon log. This is a **known-hard requirement**, not a free one.
+restart and inferring, or tailing PM2's daemon log.
+
+**Resolved (Q2).** `pm2-alertmanager` implements the daemon-log route and the lab verifies it
+end to end: a real app exceeding `max_memory_restart` produces a `memory-restart` alert carrying the
+memory figures. It is opt-in and best-effort by nature — it is tied to a log string rather than an
+API, so a PM2 release could change it, and the failure mode is silence rather than wrong alerts.
 
 ### F7 — Custom typed messages are a first-class inter-module channel
 
@@ -178,6 +195,26 @@ down, restarting, or slow **misses events permanently**.
 
 **Consequence:** `pm2-alertmanager` cannot be a pure bus subscriber and still claim reliable alerting.
 It needs reconciliation against `pm2.list()` (see its REQ-AM-24).
+
+### F11 — PM2 7 publishes event-loop metrics with no instrumentation ✅ *(live-observed)*
+
+`pm2_env.axm_monitor` is populated from `axm:monitor` bus messages, which led to the assumption that
+event-loop figures require an app instrumented with `@pm2/io`. **That is false on PM2 7.** A live
+`jlist` for an app that sends nothing contains:
+
+```json
+"Event Loop Latency":     {"type":"internal/libuv/latency/p50","value":"0.33","unit":"ms"},
+"Event Loop Latency p95": {"type":"internal/libuv/latency/p95","value":"0.56","unit":"ms"},
+"Heap Usage": {...}, "Active handles": {...}
+```
+
+**Consequences:** `pm2-probe`'s `loopLag` works out of the box; values arrive as **strings**, so they
+must be parsed; the default metric is a **p50**, with p95 available by name. The metric *names* still
+come from the instrumentation layer rather than PM2's API, so they should be matched by pattern with
+an override rather than hardcoded.
+
+This assumption went unchecked through a requirement, a guard, a README section and a lab scenario
+before being caught by running it.
 
 ### F9 — A long `PM2_HOME` silently wedges PM2 entirely ⚠️ *(found the hard way)*
 
@@ -295,6 +332,6 @@ Applies to both modules.
 | # | Question | Blocks | Proposed default |
 |---|---|---|---|
 | ~~Q1~~ | ~~Does `pm2 install <pkg>` work cleanly?~~ | — | **Resolved — see F10.** Unscoped `pm2-probe` chosen; peer deps resolve correctly |
-| Q2 | Is tailing PM2's daemon log acceptable to detect memory restarts (F6)? | REQ-AM-05 | Ship without it in v1; document the gap |
+| ~~Q2~~ | ~~Tail the daemon log to detect memory restarts?~~ | — | **Resolved — implemented and lab-verified.** See F6 |
 | Q3 | Should the probe's HTTP endpoint (REQ-PR-20) bind by default? | Security | **No** — opt-in, loopback-only default |
-| Q4 | Minimum viable alert channels for v1? | REQ-AM-10 | **Decided:** Slack + generic webhook only; generic webhook covers Teams/Discord, so native integrations wait for demand |
+| ~~Q4~~ | ~~Minimum viable alert channels for v1?~~ | — | **Superseded.** Originally decided as Slack + generic webhook only. Scope was widened on request to add Teams, Telegram, PagerDuty, Opsgenie and SMTP. PagerDuty and Opsgenie earn their place by closing the same incident on resolution rather than opening a new one; SMTP keeps nodemailer as an optional dependency |
