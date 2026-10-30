@@ -42,3 +42,27 @@ Verified against **PM2 7.1.1**.
 ## Licence
 
 MIT — see [LICENSE](./LICENSE).
+
+## Conformance suite
+
+[`conformance/run.sh`](./conformance/run.sh) tests the two modules **together**, through
+paths that neither module's own tests can reach:
+
+- the real `pm2 install` path — tarball install, `pmx_module`, `module_conf.json`, and the
+  restart that `pm2 set` triggers;
+- the wire contract **across process boundaries** — `pm2-probe` emits, `pm2-alertmanager`
+  consumes, and a local webhook collector records what a human would have been sent.
+
+```bash
+(cd ../pm2-probe && npm run build) && (cd ../pm2-alertmanager && npm run build)
+./conformance/run.sh
+```
+
+It asserts that breaking one cluster instance restarts only that instance and produces one
+`probe-fail` alert followed by a resolution notice, and that an app restarting 15 times
+produces 2 alerts rather than 15.
+
+Both bugs it found on its first run were in the test itself, not the modules — including
+one where the cluster guard correctly refused to probe an app whose instances shared a
+port. That is the guard working, and it is worth knowing the suite is sharp enough to
+catch its own mistakes.

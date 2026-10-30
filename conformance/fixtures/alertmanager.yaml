@@ -1,0 +1,24 @@
+# Timings compressed so the suite runs in under two minutes. Production defaults are
+# much longer (60s startup grace, 30s grouping, 5m dedup).
+logLevel: debug
+startupGraceSeconds: 5
+resolveAfterSeconds: 10
+reconcileSeconds: 10
+
+suppression:
+  groupWindowSeconds: 2
+  dedupWindowSeconds: 60
+  crashLoopRenotifySeconds: 3600
+  minSeverity: warning
+
+content:
+  logLines: 5
+
+channels:
+  collector:
+    type: webhook
+    url: http://127.0.0.1:9099/alert
+
+routes:
+  - match: {}
+    channels: [collector]
