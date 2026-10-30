@@ -12,10 +12,11 @@ them. Those live here rather than being duplicated into each repo and left to dr
 | File | What it is |
 | --- | --- |
 | [`00-platform-and-contract.md`](./00-platform-and-contract.md) | Verified PM2 platform findings (F1–F10) and the `pm2-probe:status` wire contract |
-| [`02-pm2-alertmanager.md`](./02-pm2-alertmanager.md) | Requirements for `pm2-alertmanager`, parked here until that repo exists |
 
-`pm2-probe`'s own requirements live with the code, in
-[`pm2-probe/docs/requirements.md`](../pm2-probe/docs/requirements.md).
+Each module's own requirements live with its code:
+
+- [`pm2-probe/docs/requirements.md`](../pm2-probe/docs/requirements.md) — the producer
+- [`pm2-alertmanager/docs/requirements.md`](../pm2-alertmanager/docs/requirements.md) — the consumer
 
 ## Why a contract document rather than a shared package
 
