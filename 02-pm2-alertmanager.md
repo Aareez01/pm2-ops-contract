@@ -72,9 +72,18 @@ and resolution notices.
   collected into one notification rather than sent individually. A 4-instance simultaneous crash is
   one message naming 4 instances.
 - **REQ-AM-10** — **Crash-loop collapse.** On `restart overlimit`, or on N crashes within a window,
-  emit exactly **one** alert describing the loop (count, window, first/last timestamp) and then
-  suppress further alerts for that app until it recovers or a long re-notify interval elapses
-  (default 1 h).
+  emit **one** alert describing the loop (count, window, first/last timestamp) and then suppress
+  further alerts for that app until it recovers or a long re-notify interval elapses (default 1 h).
+
+  *Revised during implementation.* This originally demanded "exactly one" alert in total. The honest
+  behaviour is **two**: the first crash is reported immediately as a `warning`, and the escalation to
+  a crash loop is reported once as `critical`. Satisfying the literal "exactly one" would mean holding
+  the first crash for a full crash-loop window (default 60 s) before saying anything — delaying the
+  notification that matters most in order to win a word count.
+
+  The property that actually matters is that the alert count is **bounded and independent of the
+  crash count**. That is what is asserted: 50, 200 and 1000 crashes each produce exactly two
+  notifications.
 - **REQ-AM-11** — **Flap damping.** An app transitioning healthy↔unhealthy more than N times in a
   window is alerted once as "flapping", not once per transition.
 - **REQ-AM-12** — **Startup suppression.** For `startupGraceSeconds` (default 60) after module boot,
@@ -148,7 +157,8 @@ and resolution notices.
 
 ## 4. Acceptance criteria
 
-1. An app crash-looping 50 times in 2 minutes produces **exactly one** alert, not 50.
+1. An app crash-looping 50 times in 2 minutes produces **two** alerts — one `crash`, one
+   `crash-loop` escalation — and the same two at 200 and 1000 crashes (REQ-AM-10). Never 50.
 2. Restarting the PM2 daemon with 10 apps running produces **zero** alerts (REQ-AM-12).
 3. `pm2 stop api` produces no alert at default settings; `pm2 stop api` with `alertOnManual: true`
    produces one `info` alert.
