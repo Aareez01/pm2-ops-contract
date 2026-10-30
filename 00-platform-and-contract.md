@@ -15,7 +15,7 @@ shared TypeScript type. This document is that contract, plus the platform facts 
 These were established by reading and executing PM2 7.1.1 locally, not from documentation. Each one
 changes a requirement, so they are recorded with their evidence.
 
-### F1 — Custom keys in `ecosystem.config.js` are silently discarded
+### F1 - Custom keys in `ecosystem.config.js` are silently discarded
 
 `Common.verifyConfs()` passes every app through `Config.validateJSON()`
 (`lib/tools/Config.js`), which builds its result as a **whitelist**: it iterates the 65 keys in
@@ -32,13 +32,13 @@ Executed test result:
 | `name`, `script`, `env` | Yes |
 
 **Consequence:** the gap-analysis document proposes "a `probe` block in `ecosystem.config.js`". That
-mechanism does not work and must not be specified. No warning is printed — the key vanishes silently,
+mechanism does not work and must not be specified. No warning is printed - the key vanishes silently,
 which would be a miserable first-run experience.
 
 **Re-confirmed against a live daemon.** The walking skeleton started a real app from an ecosystem file
 containing both `probe` and `pm2_ops` keys; `pm2 jlist` reported `probe: false`, `pm2_ops: false`.
 
-### F2 — Three config channels actually exist
+### F2 - Three config channels actually exist
 
 | Channel | Mechanism | Survives? | Visible to module via |
 |---|---|---|---|
@@ -52,36 +52,36 @@ hijacking it would collide with legitimate use. **Do not use it.**
 **Live-verified:** app env vars are readable from `pm2.list()` at **both** `pm2_env.PORT` and
 `pm2_env.env.PORT`. Consumers should check both, since which one is populated depends on how the app
 was started. `increment_var: 'PORT'` correctly yielded distinct ports per instance
-(`pm_id0=:3100, pm_id1=:3101`), which is what makes per-instance HTTP probing possible at all — see
+(`pm_id0=:3100, pm_id1=:3101`), which is what makes per-instance HTTP probing possible at all - see
 REQ-PR-11 and the cluster-mode caveat in `pm2-liveness/docs/requirements.md`.
 
-### F3 — `pm2 set` *does* restart the target module
+### F3 - `pm2 set` *does* restart the target module
 
 `CLI.prototype.set` calls `that.restart(app_name, { updateEnv: true })` when the key contains `:` or
 `.`. So config changes applied through `pm2 set` take effect automatically.
 
-Hand-editing `module_conf.json` via `pm2 conf` does **not** — PM2 prints "To take changes into
+Hand-editing `module_conf.json` via `pm2 conf` does **not** - PM2 prints "To take changes into
 account, please restart module related." Both modules must therefore tolerate a restart as the normal
 config-reload path, and must not assume in-process hot reload.
 
-### F4 — The native event vocabulary (corrected by live run)
+### F4 - The native event vocabulary (corrected by live run)
 
 `God.notify()` is called with these action names (`lib/God.js`, `lib/God/ActionMethods.js`):
 
 - `start`
 - `online`
 - `exit`
-- `restart overlimit` — note the **space**, not a colon or underscore
+- `restart overlimit` - note the **space**, not a colon or underscore
 
 **A `restart` event also exists.** It is emitted through `God.notifyByProcessId`, driven from
-`lib/Client.js:551`, not through `God.notify` — which is why a grep of `God.notify` call sites misses
+`lib/Client.js:551`, not through `God.notify` - which is why a grep of `God.notify` call sites misses
 it. The walking skeleton observed `event="restart"` on the bus directly.
 
 All arrive on the bus as `process:event` with `{ event, manually, process, at }`.
 
 There is still **no** `errored` event and **no** memory-restart event (see F6); those must be derived.
 
-### F4a — `exit` fires twice per restart ⚠️ *(live-observed)*
+### F4a - `exit` fires twice per restart ⚠️ *(live-observed)*
 
 The skeleton captured this exact sequence for one probe-triggered restart of `pm_id=1`:
 
@@ -97,15 +97,15 @@ restart status=online     restarts=1   manually=true
 `(pm_id, status)` or count only `status === 'stopped'`.
 
 Note also that `status` is the status **at emit time**, so the `online` event carries
-`status=launching`. Consumers must not treat the event's `status` as the settled state — read it from
+`status=launching`. Consumers must not treat the event's `status` as the settled state - read it from
 `pm2.list()` instead.
 
-### F4b — `manually: true` means "via the API/CLI", not "by a human" ⚠️ *(live-observed)*
+### F4b - `manually: true` means "via the API/CLI", not "by a human" ⚠️ *(live-observed)*
 
 The skeleton's probe module restarted an instance **programmatically** via `pm2.restart(pm_id)`, and
 the resulting event carried `manually=true`.
 
-**Consequence — and a second correction.** `manually` cannot be read as "a human did it": a
+**Consequence - and a second correction.** `manually` cannot be read as "a human did it": a
 `pm2.restart()` from `pm2-liveness` sets it. But the more important fact is that **it is always `false`
 on an `exit` event**, so it cannot classify an exit at all:
 
@@ -121,11 +121,11 @@ An earlier revision of REQ-AM-03a proposed using the flag to tell a deliberate s
 That could never have worked, and the lab proved it: the scenario did not change. The real
 discriminator is **what follows the exit**, not the exit itself. See REQ-AM-03a.
 
-### F5 — `process:event` payload shape
+### F5 - `process:event` payload shape
 
 `Utility.formatCLU()` returns `clone(process.pm2_env)` with **`env` deleted**. So the payload carries
 `name`, `pm_id`, `status`, `restart_time`, `unstable_restarts`, `exit_code`, `pm_uptime`,
-`exec_mode`, `namespace`, `versioning.revision`, log paths — but **not** the app's environment
+`exec_mode`, `namespace`, `versioning.revision`, log paths - but **not** the app's environment
 variables.
 
 **Consequence:** config stashed in `env` (F2) is *not* readable from an event payload. A consumer
@@ -133,7 +133,7 @@ needing it must call `pm2.list()` separately.
 
 **Live-verified:** every `process:event` observed by the skeleton reported `env_present=false`.
 
-### F6 — `max_memory_restart` emits no distinguishable signal
+### F6 - `max_memory_restart` emits no distinguishable signal
 
 `lib/Worker.js` calls `God.reloadProcessId()` directly and logs to the daemon's own stdout. The
 resulting bus traffic is indistinguishable from any other reload. The gap-analysis document lists
@@ -142,10 +142,10 @@ restart and inferring, or tailing PM2's daemon log.
 
 **Resolved (Q2).** `pm2-alertmanager` implements the daemon-log route and the lab verifies it
 end to end: a real app exceeding `max_memory_restart` produces a `memory-restart` alert carrying the
-memory figures. It is opt-in and best-effort by nature — it is tied to a log string rather than an
+memory figures. It is opt-in and best-effort by nature - it is tied to a log string rather than an
 API, so a PM2 release could change it, and the failure mode is silence rather than wrong alerts.
 
-### F7 — Custom typed messages are a first-class inter-module channel
+### F7 - Custom typed messages are a first-class inter-module channel
 
 In both `ClusterMode.js` and `ForkMode.js`:
 
@@ -173,7 +173,7 @@ global bus under `type` as the event name, and forwarded to **every** external `
 2. The attached `process` descriptor is **reduced** to four fields. Everything else the consumer needs
    must be inside `data`.
 
-**Live-verified — this is the single most important confirmation in this document.** The skeleton's
+**Live-verified - this is the single most important confirmation in this document.** The skeleton's
 probe process emitted `pm2-liveness:status`; a separate listener process received it via `launchBus`
 with the payload fully intact:
 
@@ -188,7 +188,7 @@ Note the `process` envelope identifies the **emitter** (`name: probe`), *not* th
 (`demo-api`). Constraint 2 above is therefore load-bearing: all subject identity must live in `data`,
 which is why `app` and `pm_id` are required fields in the contract (C4).
 
-### F8 — The bus is fire-and-forget
+### F8 - The bus is fire-and-forget
 
 The pub socket has no delivery guarantee, no acknowledgement, and no replay. A subscriber that is
 down, restarting, or slow **misses events permanently**.
@@ -196,7 +196,7 @@ down, restarting, or slow **misses events permanently**.
 **Consequence:** `pm2-alertmanager` cannot be a pure bus subscriber and still claim reliable alerting.
 It needs reconciliation against `pm2.list()` (see its REQ-AM-24).
 
-### F11 — PM2 7 publishes event-loop metrics with no instrumentation ✅ *(live-observed)*
+### F11 - PM2 7 publishes event-loop metrics with no instrumentation ✅ *(live-observed)*
 
 `pm2_env.axm_monitor` is populated from `axm:monitor` bus messages, which led to the assumption that
 event-loop figures require an app instrumented with `@pm2/io`. **That is false on PM2 7.** A live
@@ -216,7 +216,7 @@ an override rather than hardcoded.
 This assumption went unchecked through a requirement, a guard, a README section and a lab scenario
 before being caught by running it.
 
-### F14 — Env CAN be injected into another app, but not through the public API ✅ *(live-verified)*
+### F14 - Env CAN be injected into another app, but not through the public API ✅ *(live-verified)*
 
 `pm2.restart(name, { env: {...} })` does **not** inject variables. PM2 reads `env` as an
 environment *name* (`--env production`) and rejects the call:
@@ -237,10 +237,10 @@ injected value and `pm2_env.env` carried it.
 
 **Consequences:** `pm2-secrets` is feasible. Cluster apps can take new values **zero-downtime**
 via `reloadProcessId`; fork apps need `restartProcessId`. But `executeRemote` is an internal
-surface, not a documented API — it is a dependency to pin PM2 versions against and to re-verify
+surface, not a documented API - it is a dependency to pin PM2 versions against and to re-verify
 on upgrade.
 
-### F15 — Injected env is NOT private, and `pm2 save` writes it to a world-readable file ⚠️ ✅ *(live-verified)*
+### F15 - Injected env is NOT private, and `pm2 save` writes it to a world-readable file ⚠️ ✅ *(live-verified)*
 
 Anything placed in `pm2_env.env` is visible to anyone who can talk to the daemon:
 
@@ -252,7 +252,7 @@ Anything placed in `pm2_env.env` is visible to anyone who can talk to the daemon
 
 **Consequence for `pm2-secrets`:** "removes plaintext `.env` files from servers" is only half
 true. Direct env injection moves the secret out of git and into a vault with central rotation and
-audit — real benefits — but locally it is *less* private than a `.env` file at 0600, because the
+audit - real benefits - but locally it is *less* private than a `.env` file at 0600, because the
 dump is world-readable.
 
 The requirement that secrets be "masked in `pm2 env` and `pm2 show` output" is therefore **not
@@ -260,26 +260,26 @@ achievable**: PM2 owns that output and we are injecting into the structure it pr
 only mask its *own* logs, warn about the exposure, and offer a mode that avoids `pm2_env`
 altogether by writing a 0600 file and injecting only its path.
 
-### F12 — In cluster mode the WORKER owns the log file descriptors ⚠️ ✅ *(live-verified)*
+### F12 - In cluster mode the WORKER owns the log file descriptors ⚠️ ✅ *(live-verified)*
 
 `ProcessContainer.js` replaces `process.stdout.write` / `process.stderr.write` in each cluster
 worker. The replacement writes to the log file **from the worker process** and forwards a copy to
 the daemon over IPC (`process.send({ type: 'log:out', ... })`), which is what produces the
 `log:out` / `log:err` bus events. `StdioLogger.js` states in its own header that what reaches the
-daemon's pipe is only what *bypassed* those hooks — direct fd writes (pino, sonic-boom), children
+daemon's pipe is only what *bypassed* those hooks - direct fd writes (pino, sonic-boom), children
 spawned with `stdio: 'inherit'`, native addons.
 
 **Consequence:** renaming a log file does not redirect PM2's writes. Every worker keeps its open
-descriptor and keeps appending to the renamed or deleted inode — the file disappears from `ls`
+descriptor and keeps appending to the renamed or deleted inode - the file disappears from `ls`
 while the disk keeps filling. Any log rotator that treats rotation as a rename is broken in cluster
 mode by construction.
 
 **Verified by experiment** (lab scenario 40), against a 2-instance cluster app under continuous
 write. After renaming the log file: the renamed inode kept growing, nothing recreated or wrote to
-the original path, and `/proc/<worker-pid>/fd` showed the **worker process** — not the daemon —
+the original path, and `/proc/<worker-pid>/fd` showed the **worker process** - not the daemon -
 holding the renamed file open.
 
-### F13 — Reopening log files is an explicit, per-worker, refusable protocol ✅ *(live-verified)*
+### F13 - Reopening log files is an explicit, per-worker, refusable protocol ✅ *(live-verified)*
 
 `God.reloadLogs` (`lib/God/ActionMethods.js`) recreates the daemon-side streams first, then sends
 `{ type: 'log:reload' }` to each cluster worker; the worker closes its streams and calls
@@ -296,23 +296,23 @@ handle both the per-instance and merged layouts, attributing merged lines to an 
 instance.
 
 **Verified by experiment** (lab scenario 40): after `pm2 reloadLogs`, the workers wrote to the newly
-created file and the renamed one stopped growing — so compression is safe only *after* the reopen,
+created file and the renamed one stopped growing - so compression is safe only *after* the reopen,
 never before. Per-instance paths (`chatty-app-out-3.log`, `-4.log`) were confirmed with `merge_logs`
 unset.
 
-### F9 — A long `PM2_HOME` silently wedges PM2 entirely ⚠️ *(found the hard way)*
+### F9 - A long `PM2_HOME` silently wedges PM2 entirely ⚠️ *(found the hard way)*
 
 PM2 binds `$PM2_HOME/rpc.sock` and `$PM2_HOME/pub.sock`. Linux caps unix socket paths (`sun_path`) at
 **107 characters**. When `PM2_HOME` is long enough to exceed it:
 
 - the daemon starts, writes `pm2.pid`, `module_conf.json` and `logs/`, and appears to be alive;
 - **no `.sock` files are ever created** and no error is surfaced anywhere;
-- every client — `ping`, `start`, `list`, even `kill` — blocks forever against a socket that will
+- every client - `ping`, `start`, `list`, even `kill` - blocks forever against a socket that will
   never exist;
 - the orphaned daemon spins at ~100% CPU indefinitely.
 
 Observed with a 148-character socket path. The failure presents as an unexplained hang with no
-diagnostic whatsoever, and `pm2 kill` cannot clear it — orphans must be killed by PID.
+diagnostic whatsoever, and `pm2 kill` cannot clear it - orphans must be killed by PID.
 
 **Consequences for both modules:**
 
@@ -323,7 +323,7 @@ diagnostic whatsoever, and `pm2 kill` cannot clear it — orphans must be killed
 - Test harnesses should assert the path length in setup and fail fast with a clear message rather
   than hanging the suite.
 
-### F10 — Module install resolves peer dependencies ✅ *(verified)*
+### F10 - Module install resolves peer dependencies ✅ *(verified)*
 
 `pm2 install <name>` runs `npm install <name> --prefix $PM2_HOME/node_modules/<name>`
 (`lib/API/Modules/NPM.js`, `getNPMCommandLine`), preferring `bun install --cwd` when bun is present.
@@ -335,17 +335,17 @@ rather than a dependency works: verified by packing `pm2-liveness` and installin
 Two consequences worth knowing:
 
 - **A second copy of PM2 is installed** inside the module directory (47 packages for `pm2-liveness`).
-  The declared production tree stays at 3 packages, but install footprint is not actually reduced —
+  The declared production tree stays at 3 packages, but install footprint is not actually reduced -
   the real benefit of the peer declaration is avoiding a *version* lock, not avoiding the download.
 - **Version skew is possible.** A peer range of `>=5` lets npm install a PM2 newer than the host
-  daemon. The RPC surface we use (`connect`, `list`, `restart`, `launchBus`) is stable across 5–7,
+  daemon. The RPC surface we use (`connect`, `list`, `restart`, `launchBus`) is stable across 5-7,
   but the range should be narrowed if that ever stops being true.
 
 ---
 
 ## 2. The wire contract
 
-Event name: **`pm2-liveness:status`** — a single event type carrying a state transition. One event type
+Event name: **`pm2-liveness:status`** - a single event type carrying a state transition. One event type
 rather than several keeps the contract small and lets consumers filter on `data.state`.
 
 Emitted by `pm2-liveness` via `process.send({ type: 'pm2-liveness:status', data: <payload> })`.
@@ -374,15 +374,15 @@ Emitted by `pm2-liveness` via `process.send({ type: 'pm2-liveness:status', data:
 
 ### Contract rules
 
-- **C1** — `v` is mandatory. Consumers MUST ignore events whose `v` they do not understand, and SHOULD
+- **C1** - `v` is mandatory. Consumers MUST ignore events whose `v` they do not understand, and SHOULD
   log once per unknown version rather than per event.
-- **C2** — Additive changes (new optional fields) do not bump `v`. Removing or retyping a field does.
-- **C3** — Consumers MUST tolerate unknown extra fields.
-- **C4** — The required fields are `v`, `state`, `app`, `pm_id`, `probe`, `probe_kind`, `at`. All
+- **C2** - Additive changes (new optional fields) do not bump `v`. Removing or retyping a field does.
+- **C3** - Consumers MUST tolerate unknown extra fields.
+- **C4** - The required fields are `v`, `state`, `app`, `pm_id`, `probe`, `probe_kind`, `at`. All
   others are optional and consumers must handle their absence.
-- **C5** — `pm2-liveness` MUST function fully with no consumer present. `pm2-alertmanager` MUST function
+- **C5** - `pm2-liveness` MUST function fully with no consumer present. `pm2-alertmanager` MUST function
   (on native events alone) with no probe installed. Neither may hard-depend on the other.
-- **C6** — The contract is published as a standalone zero-dependency package,
+- **C6** - The contract is published as a standalone zero-dependency package,
   **`@pm2-ops/probe-contract`**, containing the TypeScript types and a runtime validator. Both repos
   depend on it. This is the one shared artifact the independent-repo decision permits.
 
@@ -392,21 +392,21 @@ Emitted by `pm2-liveness` via `process.send({ type: 'pm2-liveness:status', data:
 
 Applies to both modules.
 
-- **NFR-1 — Footprint.** Steady-state RSS < 60 MB; CPU < 1% of one core when idle. These are
+- **NFR-1 - Footprint.** Steady-state RSS < 60 MB; CPU < 1% of one core when idle. These are
   always-on daemons on servers whose owners chose PM2 over Kubernetes partly for weight.
-- **NFR-2 — Never take the app down.** No unhandled rejection or uncaught exception may escape. A
+- **NFR-2 - Never take the app down.** No unhandled rejection or uncaught exception may escape. A
   module crash-looping next to a healthy app is worse than the gap it fills.
-- **NFR-3 — Dependencies.** Fewer than 15 transitive production dependencies. PM2 7 cut its own tree;
+- **NFR-3 - Dependencies.** Fewer than 15 transitive production dependencies. PM2 7 cut its own tree;
   a heavy module undercuts the pitch.
-- **NFR-4 — Node support.** Node 18 LTS and above. Ship as CJS (PM2 `module:generate` scaffolds CJS
+- **NFR-4 - Node support.** Node 18 LTS and above. Ship as CJS (PM2 `module:generate` scaffolds CJS
   and the daemon spawns modules directly); build from TypeScript to `dist/`.
-- **NFR-5 — Platform.** Linux first-class. Windows best-effort, and explicitly documented as such —
+- **NFR-5 - Platform.** Linux first-class. Windows best-effort, and explicitly documented as such -
   pm2-logrotate's reputation was damaged by silent Windows breakage.
-- **NFR-6 — Observability of the module itself.** Both modules expose internal counters via
+- **NFR-6 - Observability of the module itself.** Both modules expose internal counters via
   `pmx.probe()` so `pm2 monit` shows whether they are working.
-- **NFR-7 — Licence.** MIT. PM2 core is AGPL-3.0; these are separate processes talking over a public
+- **NFR-7 - Licence.** MIT. PM2 core is AGPL-3.0; these are separate processes talking over a public
   API. Confirm with counsel before any commercial offering (carried over from the gap analysis).
-- **NFR-8 — Config validation.** Invalid config must fail loudly at boot with a specific message
+- **NFR-8 - Config validation.** Invalid config must fail loudly at boot with a specific message
   naming the offending key. Given F1's silent-discard behaviour, loud validation is a differentiator.
 
 ---
@@ -415,7 +415,7 @@ Applies to both modules.
 
 | # | Question | Blocks | Proposed default |
 |---|---|---|---|
-| ~~Q1~~ | ~~Does `pm2 install <pkg>` work cleanly?~~ | — | **Resolved — see F10.** Unscoped `pm2-liveness` chosen; peer deps resolve correctly |
-| ~~Q2~~ | ~~Tail the daemon log to detect memory restarts?~~ | — | **Resolved — implemented and lab-verified.** See F6 |
-| Q3 | Should the probe's HTTP endpoint (REQ-PR-20) bind by default? | Security | **No** — opt-in, loopback-only default |
-| ~~Q4~~ | ~~Minimum viable alert channels for v1?~~ | — | **Superseded.** Originally decided as Slack + generic webhook only. Scope was widened on request to add Teams, Telegram, PagerDuty, Opsgenie and SMTP. PagerDuty and Opsgenie earn their place by closing the same incident on resolution rather than opening a new one; SMTP keeps nodemailer as an optional dependency |
+| ~~Q1~~ | ~~Does `pm2 install <pkg>` work cleanly?~~ | - | **Resolved - see F10.** Unscoped `pm2-liveness` chosen; peer deps resolve correctly |
+| ~~Q2~~ | ~~Tail the daemon log to detect memory restarts?~~ | - | **Resolved - implemented and lab-verified.** See F6 |
+| Q3 | Should the probe's HTTP endpoint (REQ-PR-20) bind by default? | Security | **No** - opt-in, loopback-only default |
+| ~~Q4~~ | ~~Minimum viable alert channels for v1?~~ | - | **Superseded.** Originally decided as Slack + generic webhook only. Scope was widened on request to add Teams, Telegram, PagerDuty, Opsgenie and SMTP. PagerDuty and Opsgenie earn their place by closing the same incident on resolution rather than opening a new one; SMTP keeps nodemailer as an optional dependency |
