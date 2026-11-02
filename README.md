@@ -11,7 +11,7 @@ them. Those live here rather than being duplicated into each repo and left to dr
 
 | File | What it is |
 | --- | --- |
-| [`00-platform-and-contract.md`](./00-platform-and-contract.md) | Verified PM2 platform findings (F1-F13) and the `pm2-liveness:status` wire contract |
+| [`00-platform-and-contract.md`](./00-platform-and-contract.md) | Verified PM2 platform findings (F1-F17) and the `pm2-liveness:status` wire contract |
 
 
 Each module's own requirements live with its code:
@@ -19,6 +19,9 @@ Each module's own requirements live with its code:
 - [`pm2-liveness/docs/requirements.md`](../pm2-liveness/docs/requirements.md) - the producer
 - [`pm2-alertmanager/docs/requirements.md`](../pm2-alertmanager/docs/requirements.md) - the consumer
 - [`pm2-shipper/docs/requirements.md`](../pm2-shipper/docs/requirements.md) - rotation and shipping
+- [`pm2-secrets/docs/requirements.md`](../pm2-secrets/docs/requirements.md) - secret injection
+- [`pm2-release/docs/requirements.md`](../pm2-release/docs/requirements.md) - health-gated deploys,
+  a second consumer of the same contract
 
 ## Why a contract document rather than a shared package
 
@@ -41,30 +44,31 @@ live check before trusting a new claim added here.
 
 Verified against **PM2 7.1.1**.
 
+## Test lab
+
+[`lab/`](./lab) runs every module in the suite together against one live PM2 daemon,
+installed the way a user installs them: `pm2 install` from a packed tarball, not a
+`require` of the working tree.
+
+```bash
+PM2_HOME_OVERRIDE=/tmp/plab ./lab/lab.sh        # every scenario
+PM2_HOME_OVERRIDE=/tmp/plab ./lab/lab.sh 60 61  # just these
+```
+
+Sixteen scenarios, 82 assertions. It exists because it keeps finding things the modules'
+own test suites cannot. Scenario 60 failed 7 of 11 assertions while every unit test in
+`pm2-release` was green, because the CLI built a gate object with one field undefined and
+the health check was silently never run. Twice the lab itself was the thing at fault,
+going green while the app under test had never started.
+
+Scenario 61 is the only test anywhere that proves two modules actually talk:
+`pm2-liveness` judges a reloaded instance, and `pm2-release` reads that verdict off the
+bus and reverts the release on the strength of it.
+
+`PM2_HOME` must stay short. PM2 binds `$PM2_HOME/rpc.sock` and Linux caps unix socket
+paths at 107 characters; over that the bind fails silently and every `pm2` command hangs
+forever. The lab asserts this up front rather than hanging.
+
 ## Licence
 
 MIT - see [LICENSE](./LICENSE).
-
-## Conformance suite
-
-[`conformance/run.sh`](./conformance/run.sh) tests the two modules **together**, through
-paths that neither module's own tests can reach:
-
-- the real `pm2 install` path - tarball install, `pmx_module`, `module_conf.json`, and the
-  restart that `pm2 set` triggers;
-- the wire contract **across process boundaries** - `pm2-liveness` emits, `pm2-alertmanager`
-  consumes, and a local webhook collector records what a human would have been sent.
-
-```bash
-(cd ../pm2-liveness && npm run build) && (cd ../pm2-alertmanager && npm run build)
-./conformance/run.sh
-```
-
-It asserts that breaking one cluster instance restarts only that instance and produces one
-`probe-fail` alert followed by a resolution notice, and that an app restarting 15 times
-produces 2 alerts rather than 15.
-
-Both bugs it found on its first run were in the test itself, not the modules - including
-one where the cluster guard correctly refused to probe an app whose instances shared a
-port. That is the guard working, and it is worth knowing the suite is sharp enough to
-catch its own mistakes.

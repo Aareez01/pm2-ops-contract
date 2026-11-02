@@ -14,6 +14,7 @@ set -u
 export LAB="$(cd "$(dirname "$0")" && pwd)"
 BASE="$(cd "$LAB/../.." && pwd)"
 export FIXTURES="$LAB/fixtures"
+export BASE_DIR="$BASE"
 export ALERTS_FILE="$LAB/alerts.jsonl"
 export PM2_HOME="${PM2_HOME_OVERRIDE:-$HOME/.pm2-lab}"
 export PM2_BIN="$BASE/pm2-liveness/node_modules/.bin/pm2"
@@ -35,7 +36,7 @@ if [ ${#SOCK} -ge 107 ]; then
   echo "FATAL: PM2_HOME too long (${#SOCK} >= 107) - pm2 would hang. Set PM2_HOME_OVERRIDE."
   exit 1
 fi
-for r in pm2-liveness pm2-alertmanager pm2-shipper pm2-secrets; do
+for r in pm2-liveness pm2-alertmanager pm2-shipper pm2-secrets pm2-release; do
   [ -f "$BASE/$r/dist/index.js" ] || { echo "FATAL: $r is not built (npm run build)"; exit 1; }
 done
 
