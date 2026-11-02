@@ -260,6 +260,43 @@ achievable**: PM2 owns that output and we are injecting into the structure it pr
 only mask its *own* logs, warn about the exposure, and offer a mode that avoids `pm2_env`
 altogether by writing a 0600 file and injecting only its path.
 
+### F16 - PM2 stores the SYMLINK path, not the resolved one, for both script and cwd (live-verified)
+
+Starting an app through a `current` symlink leaves `pm2_env.pm_exec_path` and
+`pm2_env.pm_cwd` pointing at the **symlink**, not at the release directory it resolves to:
+
+```
+pm_exec_path : .../relspike/current/app.js
+pm_cwd       : .../relspike/current
+```
+
+Swapping `current` to a new release and calling `reload` runs the new code. Swapping it back
+and reloading returns to the old code.
+
+**Consequence:** the Capistrano-style `releases/` + `current` symlink pattern works on PM2
+without re-registering the app. A deploy is a symlink swap plus a reload, and a rollback is the
+same operation in reverse. Had PM2 resolved the path at start time, every deploy would have
+needed a `pm2 delete` and `pm2 start`, losing the process identity and any chance of a rolling
+release.
+
+Note the cwd must be set to the symlink too. PM2 defaults `pm_cwd` to the directory the CLI ran
+in, which would pin an app to whichever release happened to be current at first start.
+
+### F17 - A cluster app can be reloaded one instance at a time (live-verified)
+
+`pm2 reload <pm_id>` reloads a single instance. Mid-deploy, the fleet genuinely serves two
+versions at once:
+
+```
+after reloading pm_id=0:   :3500 -> v2      :3501 -> v1
+after reloading pm_id=1:   :3500 -> v2      :3501 -> v2
+```
+
+**Consequence:** a health-gated rolling deploy is possible with no extra machinery. Reload one
+instance, probe it, and either continue or swap the symlink back. This is what lets
+`pm2-release` gate on `pm2-liveness:status` rather than on a timer, and it means a bad release
+can be caught while most of the fleet is still serving the old one.
+
 ### F12 - In cluster mode the WORKER owns the log file descriptors ⚠️ ✅ *(live-verified)*
 
 `ProcessContainer.js` replaces `process.stdout.write` / `process.stderr.write` in each cluster
